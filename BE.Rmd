@@ -1,0 +1,584 @@
+---
+title: 'Nonparametrics statistics: BE'
+author: "P. Neuvial"
+date: "October 10, 2020"
+output:
+  pdf_document: 
+    toc: true
+  html_document: 
+    toc: true
+editor_options: 
+  chunk_output_type: console
+---
+
+### For instructions, see [the page of the class](https://lms.isae.fr/course/view.php?id=1014)
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+QQ <- 0
+```
+
+
+# 1. Introduction
+
+## Context
+
+We focus on nonparametric kernel regression and consider the Mean (Integrated) Squared Error as a measure of risk.
+
+
+We consider the problem of estimating the following function:
+
+```{r, dafun}
+f <- function(x) sqrt(x)*sin(pi*x)
+curve(f, ylim = c(0, 1))
+```
+
+```{r}
+n <- 200
+X <- 1:n/n
+```
+
+The number of observations is $n = `r n`$ and we consider a fixed design: $X_i = i/n, i=1 \dots n$. We generate a sample by adding Gaussian errors with variance 0.2 to the true function $f$. 
+
+```{r}
+sigma <- 0.2
+sigma2 <- sigma^2
+eps <- rnorm(n, sd = sqrt(sigma2))
+Y <- f(X) + eps
+plot(X, Y)
+```
+
+## Nadaraya-Watson estimator
+
+The Nadaraya-Watson (NW) estimator of $f$ at $x \in [0,1]$ associated to the kernel $K$ is:
+
+$$\hat{f}_n(x) = \frac{\sum_{i=1}^n Y_i K\left(\frac{X_i - x}{h}\right)}{\sum_{i=1}^n K\left(\frac{X_i - x}{h}\right)}, $$
+
+where $h>0$ is called the bandwidth and $K: \mathbb{R} \to \mathbb{R}$ is a kernel. We focus here on the Gaussian kernel.
+
+## MSE and MISE
+
+The Mean Squared Error (MSE) at a point is defined by:
+
+$$MSE(x) = \mathbb{E}_f \left[ \left(\hat{f_n}(x) - f(x)\right)^2 \right],$$
+
+and the integrated risk, the Mean Integrated Squared Error (MISE), is defined by:
+
+$$MISE = \mathbb{E}_f \left[ \int_0^1 \left(\hat{f_n}(x) - f(x)\right)^2 dx\right]$$
+
+<!-- and can also be written as: -->
+
+<!-- $$MISE =  \int_0^1 MSE(x)dx$$ -->
+
+Just like during the course, we consider a discretized version of the MISE:
+
+$$MISE^D = \mathbb{E}_f \left[\frac{1}{n} \sum_{i=1}^n \left(\hat{f_n}(X_i) - f(X_i)\right)^2 \right]$$
+
+## R functions for nonpametric regression
+
+There are two main `R` functions for kernel nonparametric regression:
+
+- `ksmooth` implements the Nadaraya-Watson kernel estimate with rectangular or Gaussian kernel.
+- `locpoly` implements local polynomial estimators with Gaussian kernel. 
+
+We will only use the function `locpoly`. It is part of the package `KernSmooth`, so we load this package:
+
+```{r libs}
+library("KernSmooth")
+```
+
+We begin by looking at the help pages of these functions:
+
+```{r help}
+?locpoly
+```
+
+The three most important arguments for us are `x`, `y`, `bandwidth`, and `degree`.
+
+We will work with the following custom function:
+
+```{r locpoly2}
+NW <- function(x, y, bandwidth, gridsize = length(x), ...) {
+  locpoly(x, y, degree = 0, bandwidth = bandwidth, gridsize = gridsize, ...)
+}
+```
+
+
+# 2. Nadaraya-Watson estimator
+
+We calculate the Nadaraya-Watson estimator and plot it along with the data points:
+
+```{r, show=FALSE}
+fit <- NW(X, Y, bandwidth = 0.3)
+plot(X, Y)
+curve(f, add = TRUE, col = 2, lty = 2)
+lines(fit, col=3)
+lgd <- c("data points", "true f", "NW estimation")
+legend("bottom", lgd, col = 1:3, lty = c(NA, 2, 1), pch = c(1, NA, NA))
+```
+
+
+```{r, echo=FALSE}
+QQ <- QQ + 1
+```
+
+## Question `r QQ`: influence of the bandwidth
+
+```{r, oracle-MSE, echo = FALSE}
+MISE_NW <- function(bandwidth, x, y, f) {
+    fit <- NW(x, y, bandwidth = bandwidth)
+    mean((fit$y - f(fit$x))^2)
+}
+opt <- optimize(MISE_NW, X, Y, f, interval = c(0, 1))
+best <- round(opt$minimum, 3)
+```
+
+Let us admit for a while that a "good choice" for the bandwidth in the NW estimator is  $h^\star = `r best`$.  In order to further asses the influence of the bandwidth on the quality of estimation, we compare this choice to two other choices $h = 1/C \times h^\star$ and $h = C \times h^\star$, for $C=10$. 
+
+```{r}
+par(lwd = 2)
+plot(X, Y, col = "lightgray")
+curve(f, add = TRUE, col = 1, lty = 2)
+
+C <- 10
+bwd <- c(1/C, 1, C)*best
+for (kk in 1:length(bwd)) {
+    fit <- NW(X, Y, bandwidth = bwd[kk])
+    lines(fit, col = 1 + kk)
+}
+lgd <- c("h = 1/C x h*", "h = h*", "h = C x h*")
+legend("bottom", lgd, col = 2:4)
+```
+
+
+1. Run the same code with smaller values for $C$. 
+2. Comment on the influence of the bandwidth on the quality of estimation.
+
+```{r}
+C_list <- c(0.1, 0.5, 1, 5)
+par(mfrow = c(1,1))
+for ( C in C_list )
+{
+  plot(X, Y, col = "lightgray", main = paste("C = ", C))
+  curve(f, add = TRUE, col = 1, lty = 2)
+  bwd <- c(1/C, 1, C)*best
+  for (kk in 1:length(bwd)) {
+    fit <- NW(X, Y, bandwidth = bwd[kk])
+    lines(fit, col = 1 + kk)
+  }
+  lgd <- c("h = 1/C x h*", "h = h*", "h = C x h*")
+  legend("bottom", lgd, col = 2:4)
+}
+```
+
+If the bandwidth is too small, the estimator is unstable as it relies too much on the local number of observations. It is overfitting.
+
+If the bandwisth is too big, then the estimator is underfitting as it takes into account the number of observations in a very wide interval.
+
+# 3. Estimation of MSE and MISE
+
+The goal of this section is to estimate the optimal bandwidth for the NW estimator, and justify the choice $h^\star = `r best`$  in the preceding section. We measure the quality of estimation by the discretized MISE:
+
+$$MISE^D = \mathbb{E}_f \left[ \frac{1}{n} \sum_{i=1}^n \left(\hat{f_n}(X_i) - f(X_i)\right)^2 \right]$$
+
+<!-- Here we are interested in the M(I)SE as a function of the 
+bandwidth $h$ of the estimator $\hat{f}_n$.  -->
+
+If $f$ was known, then we could estimate the discretized MISE by the following quantity:
+
+$$\frac{1}{n} \sum_{i=1}^n \left(\hat{f_n}(X_i) - f(X_i)\right)^2$$
+
+
+```{r}
+MISE_NW <- function(bandwidth, x, y, f) {
+    fit <- NW(x, y, bandwidth = bandwidth)
+    mean((fit$y - f(fit$x))^2)
+}
+
+```
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+## Question `r QQ`: theoretical bandwidth
+
+To find the optimal bandwidth, we simply minimize `MISE_NW` as a function of $h$. 
+
+```{r}
+opt <- optimize(MISE_NW, X, Y, f, interval = c(0, 1))
+best <- round(opt$minimum, 3)
+best
+```
+
+- Can the above be done in practice, ie given only the observations `X` and `Y`?
+
+The above calculation can't be done in practice as it requires the knowledge of the function f.
+In our case, f is the objective so we can't use it.
+
+- Estimate the above optimal bandwidth from another simulation  run with $n=2,000$. Are these results consistent with the theoretical upper bounds obtained during the course? [*Hint: recall the form of the optimal bandwidth for a kernel of order 1*]. 
+
+First, let's generate new X and Y with 2000 observations
+
+```{r}
+X_2000 <- 1:2000/2000
+Y_2000 <- f(X_2000) + eps
+
+plot(X_2000, Y_2000)
+```
+
+And calculate the new optimal bandwidth.
+
+```{r}
+opt_2000 <- optimize(MISE_NW, X_2000, Y_2000, f, interval = c(0, 1))
+best_2000 <- round(opt_2000$minimum, 3)
+paste ("Optimal bandwith with 2000 observations = ", best_2000)
+```
+
+Then plot the estimated function f as well as the real f.
+
+```{r}
+plot(X_2000, Y_2000, col = "lightgray", main = paste("f vs estimated f with optimal bandwidth = ", best_2000))
+curve(f, add = TRUE, col = 1, lty = 2)
+bwd <- best_2000
+
+fit <- NW(X_2000, Y_2000, bandwidth = bwd)
+lines(fit, col ="red")
+```
+
+The estimated curve is really close to the real function f. The estimator worked well.
+
+SECONDE PARTIE A DEMANDER A ALEX
+
+- Without doing further simulation runs, estimate the optimal bandwidth for $n=20,000$ and $n=2,000,000$. 
+
+IDEM
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+## Question `r QQ`: a first estimator of the MISE
+
+We consider the following estimator of the discretized MISE:
+
+$$\widehat{MISE}^{D,0} = \frac{1}{n} \sum_{i=1}^n \left(\hat{f_n}(X_i) - Y_i\right)^2$$
+
+This estimator can be implemented as follows:
+
+```{r}
+MISE_NW_0 <- function(bandwidth, x, y) {
+    fit <- NW(x, y, bandwidth = bandwidth)
+    mean((fit$y - y)^2)
+}
+```
+
+We define a grid of 100 values for the bandwidth `h` between 0 and 0.2.
+
+```{r}
+hs <- 1:100/500
+```
+
+1.Calculate the above estimator for all bandwidths, and plot the result as a function of `h`. 
+2.Comment the results and explain why this estimator cannot be used to estimate an optimal bandwidth.
+
+```{r}
+mise_nw_0_list <- c()
+for (h in hs){
+  mise_nw_0_list[length(mise_nw_0_list) + 1] <- MISE_NW_0(h,X,Y)
+}
+
+plot(hs, mise_nw_0_list, xlab = "bandwidth", ylab = "Discretized estimator")
+```
+
+The estimator can't be used to estimate an optimal bandwidth as it always increases with the bandwidth, there is no clear optimum.
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+# 4. The bias/variance tradeoff
+
+## Question `r QQ`: an "oracle" estimator
+
+The estimator at Question 2 is based on the knowledge of $f$ and a single realization $(X,Y)$. To estimate the discretized MISE when the simulation model is known, we propose in this section to replace the expectation $\mathbb{E}_f$ in the definition of the discretized MISE by an empirical mean over simulation runs. 
+
+We start by defining a function that performs one simulation run and outputs the associated NW estimator:
+
+```{r}
+fHat <- function(bandwidth, n, sigma2, f) {
+    eps <- rnorm(n, sd = sqrt(sigma2))
+    X <- 1:n/n
+    Y <- f(X) + eps
+    fit <- NW(X, Y, bandwidth = bandwidth)
+    fit$y
+}   
+```
+
+We display the result of three simulation runs:
+
+```{r}
+curve(f, ylim = c(-0.1, 0.8))
+lines(X, fHat(0.1,  n, sigma2, f), col = 2, lty = 2)
+lines(X, fHat(0.1,  n, sigma2, f), col = 3, lty = 2)
+lines(X, fHat(0.1,  n, sigma2, f), col = 4, lty = 2)
+```
+
+Following this idea, we generate and plot a matrix of realizations of $\hat{f}$:
+
+```{r}
+bandwidth <- 0.3
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = "lightgray")        
+curve(f, add = TRUE)
+```
+
+
+
+1. What represent the following distribution of green curves :
+
+```{r}
+bandwidth <- 0.04
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = 3)
+curve(f, add = TRUE)
+```
+These are 101 estimations of f with a bandwidth = 0.04
+
+
+2. Likewise, comment on the following distribution of yellow curves :
+
+```{r}
+bandwidth <- 0.004
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = 7)
+curve(f, add = TRUE)
+```
+With a very low bandwidth, the esimator is overfitting the observations.
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+## Question `r QQ`
+
+1. Generate similar plots for other choices of bandwidths. Do these plots confirm your previous observations
+of the influence of the bandwidth?
+
+```{r}
+bandwidth <- 0.01
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = 7)
+curve(f, add = TRUE)
+```
+With a bandwidth = 0.01, we are overfitting as expected, the bandwidth is too small
+
+```{r}
+bandwidth <- 0.5
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = 7)
+curve(f, add = TRUE)
+```
+With a bandwidth = 0.5, the model is underfitting as it is too high
+
+2. We can form an estimate of the MSE as follows:
+
+```{r}
+diffs <- fHatMat - f(X)            ## Note: this is a bit dangerous
+diffs2 <- sweep(fHatMat, 1, f(X))  ## Safer but harder to understand
+max(abs(diffs2-diffs))             ## sanity check
+str(rowMeans(diffs^2))
+```
+
+
+We encapsulate the above in a function:
+
+```{r, MSE}
+MSE <- function(bandwidth, n, sigma2, f, nRep) {
+    fHatMat <- replicate(nRep, fHat(bandwidth, n, sigma2, f))
+    diffs <- sweep(fHatMat, 1, f(X))
+    mse <- rowMeans(diffs^2)
+}
+```
+
+
+We recall that we have the following bias-variance decomposition: 
+
+$$ MISE = \int_0^1 b^2(x) dx + \int_0^1 \sigma^2(x) dx,$$
+
+where $b(x) =  \mathbb{E}_f \left[\hat{f_n}(x)  \right]- f(x)$ and  $\sigma^2(x) = \mathbb{E}_f \left[(\hat{f_n}(x) -  \mathbb{E}_f (\hat{f_n}(x)))^2 \right]$.
+
+
+What do the following quantities MSHh1,2,3 and Estim1,2,3 contain ?
+
+```{r}
+MSEh1 <- MSE(0.3, n, sigma2, f, 1001)
+MSEh2 <- MSE(0.04, n, sigma2, f, 101)
+MSEh3 <- MSE(0.003, n, sigma2, f, 101)
+Estim1=sum(MSEh1)/n
+Estim2=sum(MSEh2)/n
+Estim3=sum(MSEh3)/n
+Estim1
+Estim2
+Estim3
+```
+
+MSEh1.2.3 are vector of size n containing the MSE for each observation over the nRep contained in fhatmat.
+Estim1,2,3 are scalars equal to the mean of the n MSE
+
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+## Question `r QQ`
+
+1. Can this estimator of MSE be used in practice?
+No it can't be used in practice, because it is once again using f to calculate b.
+
+2. Estimate $b^2:=\int_0^1 b^2(x)dx$, $\sigma^2:=\int_0^1 \sigma^2(x)dx$ and plot them as a function of $h$ on the same figure along with  $MISE$. Comment on this figure in terms of bias-variance tradeoff.
+
+```{r}
+calculate_bias_and_variance <- function (nrep) {
+  bias_list <- c()
+  var_list <- c()
+  
+  for (h in hs){
+    fHatMat <- replicate(nRep, fHat(h, n, sigma2, f))
+    diffs <- sweep(fHatMat, 1, f(X))
+    mse <- rowMeans(diffs^2)
+  }
+}
+```
+
+
+# 4. Boundary effects
+
+We now focus at the pointwise risk (MSE).  We can visualize the influence of the choice of $h$ directly on MSE. Again, we compare the "optimal" bandwidth to two other choices $h = 1/C \times h^\star$ and $h = C \times h^\star$, for a given $C>1$. 
+
+```{r}
+par(lwd = 2)
+C <- 3
+plot(X, MSE(best/C, n, sigma2, f, 50), t = 'l', ylab = "MSE", col = 2, ylim = c(0, 0.1))
+lines(X, MSE(best, n, sigma2, f, 50), col = 3)
+lines(X, MSE(C*best, n, sigma2, f, 50), col = 4)
+lgd <- c("h = 1/C x h*", "h = h*", "h = C x h*")
+legend("top", lgd, col = 2:4, lty = 1)
+abline(h=0, lty = 2)
+```
+
+
+```{r, echo=FALSE}
+QQ <- QQ + 1
+```
+
+## Question `r QQ`
+
+
+1. Is the estimated MSE for the optimal bandwidth uniformly low or do you see a systematic bias?
+1. Recalling the shape of the true function $f$ (see below), and recalling that we are studying the Nadaraya-Waston estimator, can you propose an explanation for what happens near the boundary of the interval [0,1]?
+
+```{r}
+curve(f)
+```
+
+# 5. Local polynomials
+
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+
+## Question `r QQ`
+
+1. Using the above example of Nadaraya-Watson, create a function `fHat_LP` that generates a local polynomial regression estimator, and functions `MSE_LP` and `MISE_LP` that estimate the associated MSE and MISE, respectively.
+1. Calculate the optimal bandwidth for local polynomial estimators of degree 0, 1, 2. 
+1. Plot the MSE associated to the optimal bandwidth, and compare the MSE at the boundary for local polynomial estimators of degree 0, 1, 2.
+
+# 6. Cross-validation
+
+
+Recall that a linear nonparametric estimator is an estimator that may be written as
+
+$$ \hat{f}_{n,h}(x) = \sum_{i=1}^{n} Y_i W_{ni}(x, h) $$
+
+(It is linear in $Y$.) A nice property of linear NP estimators is that the leave-one-out cross-validation risk may be explicitly written as
+
+$$CV(h) = \frac{1}{n} \sum_{i=1}^n \left(\frac{Y_i - \hat{f}(X_i)}{1-W_{ni}(X_i, h)} \right)^2$$
+
+Local polynomial estimators are instances of linear NP estimators. 
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+In the case of local polynomials, the matrix of weights $W=(W_{ni}(X_j))_{i,j}$ may be obtained using a simple `R` function
+
+```{r}
+getW <- function(X, h) {
+    n <- length(X)
+    W <- matrix(NA, n, n)
+    for (ii in 1:n){
+        Yi <- rep(0, n)
+        Yi[ii] <- 1
+        fit <- locpoly(X, Yi, bandwidth = h, gridsize = n)
+        W[ii, ] <- fit$y
+    }
+    W
+}
+```
+
+## Question `r QQ`
+
+1. explain why the above code does indeed calculate $W$
+1. write a function to estimate the cross-validation risk for a local polynomial estimator
+1. compare the cross-validation bandwidth to the optimal bandwidth in terms of associated MSE. 
+1. which of the two should be used in practice?
+
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+## Question `r QQ`: bonus
+
+1. The function `locpoly` can also calculate derivatives of the regression:
+
+```{r}
+fit <- locpoly(X, Y, drv = 1, bandwidth = 0.1, gridsize=length(X))
+plot(fit$x, fit$y)
+ff <- function(x) sin(pi*x)/sqrt(x)/2 + pi*sqrt(x)*cos(pi*x)
+curve(ff, add = TRUE)
+```
+
+
+
+# Appendix
+
+## Why fixing the grid size in `locpoly`?
+
+By default the `locpoly` function returns a vector of values for $\hat{f}(x)$ for 401 equally-spaced values of $x$ in $[0,1]$. Here, we want $\hat{f}(X_i)$ for $1 \leq i \leq n$,  where the $X_i$ are `n` equally-spaced values in $[0,1]$: 
+
+```{r, eval=FALSE}
+fit <- locpoly(X, Y, bandwidth = 1)
+length(fit$y)
+length(fit$y) == length(X)
+```
+
+Our custom function  `locpoly2` forces the option `gridsize`  n `locpoly` to match the size of the input design: 
+
+```{r, eval=FALSE}
+fit <- locpoly2(X, Y, bandwidth = 1)
+length(fit$y)
+length(fit$y) == length(X)
+```
+
+```{r}
+max(abs(X - fit$x))
+```

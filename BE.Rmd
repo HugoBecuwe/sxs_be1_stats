@@ -3,15 +3,19 @@ title: 'Nonparametrics statistics: BE'
 author: "P. Neuvial"
 date: "October 10, 2020"
 output:
-  pdf_document: 
-    toc: true
   html_document: 
+    toc: true
+  pdf_document: 
     toc: true
 editor_options: 
   chunk_output_type: console
 ---
 
 ### For instructions, see [the page of the class](https://lms.isae.fr/course/view.php?id=1014)
+
+```{r}
+rm(list = ls())
+```
 
 
 ```{r setup, include=FALSE}
@@ -445,22 +449,70 @@ No it can't be used in practice, because it is once again using f to calculate b
 2. Estimate $b^2:=\int_0^1 b^2(x)dx$, $\sigma^2:=\int_0^1 \sigma^2(x)dx$ and plot them as a function of $h$ on the same figure along with  $MISE$. Comment on this figure in terms of bias-variance tradeoff.
 
 ```{r}
-calculate_bias_and_variance <- function (nrep) {
+calculate_bias_and_variance <- function (nRep, X_vect) {
   bias_list <- c()
   var_list <- c()
   
+  n <- length(X_vect)
+  
   for (h in hs){
     fHatMat <- replicate(nRep, fHat(h, n, sigma2, f))
-    diffs <- sweep(fHatMat, 1, f(X))
-    mse <- rowMeans(diffs^2)
+    
+    FHatMat_esp <- rowMeans(fHatMat)
+    bias <- FHatMat_esp - f(X_vect)
+    
+    diffs <- sweep(fHatMat, 1, FHatMat_esp)
+    var <- rowMeans(diffs^2)
+    
+    bias_list[length(bias_list) + 1] <- sum(bias**2)/n
+    var_list[length(var_list) +1 ] <- sum(var)/n
   }
+  
+  return( list ("bias" = bias_list, "var" = var_list) )
 }
+
+nRep <- 101
+hs <- 1:200/200
+bias_and_var <- calculate_bias_and_variance(nRep, X)
 ```
 
 
-# 4. Boundary effects
+```{r}
+bias_list <- bias_and_var$bias
+var_list <- bias_and_var$var
+mise_list <- bias_list + var_list
+
+plot(x = hs, y = bias_list, col = "blue")
+points(x = hs, y = var_list, col = "red")
+points(x = hs, y = mise_list, col = "black")
+```
+
+
+```{r}
+hs <- 1:100/500
+bias_and_var <- calculate_bias_and_variance(nRep, X)
+
+bias_list <- bias_and_var$bias
+var_list <- bias_and_var$var
+mise_list <- bias_list + var_list
+
+plot(x = hs, y = bias_list, col = "blue")
+points(x = hs, y = var_list, col = "red")
+points(x=hs, y = mise_list, col = "black")
+```
+
+
+```{r}
+h_opt_mise <- hs[which.min(mise_list)]
+print(paste("The bandwidth that minimizes the mise is", h_opt_mise))
+print(paste("The bandwidth that was estimated previously as optimum was", best))
+```
+
+# 5. Boundary effects
 
 We now focus at the pointwise risk (MSE).  We can visualize the influence of the choice of $h$ directly on MSE. Again, we compare the "optimal" bandwidth to two other choices $h = 1/C \times h^\star$ and $h = C \times h^\star$, for a given $C>1$. 
+
+Execute then explain what represent the following plot. You may change C also.
 
 ```{r}
 par(lwd = 2)
@@ -473,6 +525,27 @@ legend("top", lgd, col = 2:4, lty = 1)
 abline(h=0, lty = 2)
 ```
 
+This plots represents the MSE as a function of X:
+For each X, nRep evaluations of the function f are made, and a MSE is calculated from these nRep values.
+The plots for C = 3 shows that the MSE is really low from 0.2 to 0.8 whatever h, but on the boundaries of the interval, it increases.
+
+Let's try it with other values for C:
+```{r}
+par(lwd = 2, mfrow = c(1,1))
+C_list <- c(1,3,5,10)
+for (C in C_list) {
+  plot(X, MSE(best/C, n, sigma2, f, 50), t = 'l', ylab = "MSE", col = 2, ylim = c(0, 0.1), main = paste("C = ", C))
+  lines(X, MSE(best, n, sigma2, f, 50), col = 3)
+  lines(X, MSE(C*best, n, sigma2, f, 50), col = 4)
+  lgd <- c("h = 1/C x h*", "h = h*", "h = C x h*")
+  legend("top", lgd, col = 2:4, lty = 1)
+  abline(h=0, lty = 2)
+  }
+```
+
+The boundary effects appear whatever the value of C is. We can even notice that for the greatest C, the MSE also increases in the center of the interval.
+That is because a large C implicates very small (h*/C) or large (h* x C) bandwidth which are situations of overfitting or underfitting.
+
 
 ```{r, echo=FALSE}
 QQ <- QQ + 1
@@ -480,13 +553,58 @@ QQ <- QQ + 1
 
 ## Question `r QQ`
 
-
 1. Is the estimated MSE for the optimal bandwidth uniformly low or do you see a systematic bias?
-1. Recalling the shape of the true function $f$ (see below), and recalling that we are studying the Nadaraya-Waston estimator, can you propose an explanation for what happens near the boundary of the interval [0,1]?
 
 ```{r}
-curve(f)
+par(lwd = 2, mfrow = c(1,1))
+plot(X, MSE(best, n, sigma2, f, 50), col = 1)
+lgd <- c("h = h*")
+legend("top", lgd, col = 2:4, lty = 1)
+abline(h=0, lty = 2)
 ```
+
+We notice the boundary effects commented in the previous question. There is a systematic bias near the boundaries of the interval [0,1].
+Appart from these boundary effects, the MSE is systematically low.
+
+2. Recalling the shape of the true function $f$ (see below), and recalling that we are studying the Nadaraya-Waston estimator, can you propose an explanation for what happens near the boundary of the interval [0,1]?
+
+```{r}
+bandwidth <- best
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = 7)
+curve(f, add = TRUE)
+```
+
+The NW estimator can be seen as a weighted average of the $Y_i$ where the weights are decided by a Gaussian kernel.
+The further the points are from $x$, the lower the weight in the estimation.
+
+For instance, with $x = 1/2$, a large part of the interval is taken into account to calculate the estimator.
+Moreover, this is the central zone in which the function is maximum so a large part of the information is used.
+
+But in the boundaries, a small part of the $X_i$ are really used because half of the gaussian centred on 0 or 1 is off limits.
+Moreover, the function f is very close to 0 for $x \sim 0$ or $x \sim 1$. So the majority of the observations information is very low weighted and not taken into account for the calcul of the estimator.
+
+That's why the estimator isn't great at the boundaries for this function.
+
+3. In particular, try to figure out what happens with the estimator when the bandwidth is rather large, and illustrate it.
+
+When the bandwidth is rather large, then the weights are more centered. That means that for a given $x$, more weight will be given to the $X_i \sim x$ and fewer to the other $X_i$.
+
+So the estimator will be mostly calculated on zones where there is very few information as the function is close to zero.
+
+We expect the boundary effect to be more important in that case as explained in the previous question.
+
+```{r}
+bandwidth <- best * 2
+fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
+curve(f)
+matlines(X, fHatMat, col = 7)
+curve(f, add = TRUE)
+```
+
+As seen on the plot, the boundary effect increase even at $h = 2*h_{opt}$.
+
 
 # 5. Local polynomials
 

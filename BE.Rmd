@@ -1,14 +1,16 @@
 ---
 title: 'Nonparametrics statistics: BE'
-author: "P. Neuvial"
-date: "October 10, 2020"
+author: "BECUWE Hugo & BONNET Alexander"
+date: "November 5, 2021"
 output:
-  html_document: 
-    toc: true
-  pdf_document: 
-    toc: true
-editor_options: 
-  chunk_output_type: console
+  html_document:
+    toc: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+editor_options:
+  chunk_output_type: inline
 ---
 
 ### For instructions, see [the page of the class](https://lms.isae.fr/course/view.php?id=1014)
@@ -95,7 +97,7 @@ library("KernSmooth")
 We begin by looking at the help pages of these functions:
 
 ```{r help}
-?locpoly
+# ?locpoly
 ```
 
 The three most important arguments for us are `x`, `y`, `bandwidth`, and `degree`.
@@ -108,6 +110,14 @@ NW <- function(x, y, bandwidth, gridsize = length(x), ...) {
 }
 ```
 
+```{r, oracle-MSE, echo = FALSE}
+MISE_NW <- function(bandwidth, x, y, f) {
+    fit <- NW(x, y, bandwidth = bandwidth)
+    mean((fit$y - f(fit$x))^2)
+}
+opt <- optimize(MISE_NW, X, Y, f, interval = c(0, 1))
+best <- round(opt$minimum, 3)
+```
 
 # 2. Nadaraya-Watson estimator
 
@@ -129,15 +139,6 @@ QQ <- QQ + 1
 
 ## Question `r QQ`: influence of the bandwidth
 
-```{r, oracle-MSE, echo = FALSE}
-MISE_NW <- function(bandwidth, x, y, f) {
-    fit <- NW(x, y, bandwidth = bandwidth)
-    mean((fit$y - f(fit$x))^2)
-}
-opt <- optimize(MISE_NW, X, Y, f, interval = c(0, 1))
-best <- round(opt$minimum, 3)
-```
-
 Let us admit for a while that a "good choice" for the bandwidth in the NW estimator is  $h^\star = `r best`$.  In order to further asses the influence of the bandwidth on the quality of estimation, we compare this choice to two other choices $h = 1/C \times h^\star$ and $h = C \times h^\star$, for $C=10$. 
 
 ```{r}
@@ -157,7 +158,7 @@ legend("bottom", lgd, col = 2:4)
 
 
 1. Run the same code with smaller values for $C$. 
-2. Comment on the influence of the bandwidth on the quality of estimation.
+
 
 ```{r}
 C_list <- c(0.1, 0.5, 1, 5)
@@ -172,13 +173,23 @@ for ( C in C_list )
     lines(fit, col = 1 + kk)
   }
   lgd <- c("h = 1/C x h*", "h = h*", "h = C x h*")
-  legend("bottom", lgd, col = 2:4)
+  legend("topright", lgd, col = 2:4, lty = 1)
 }
 ```
 
-If the bandwidth is too small, the estimator is unstable as it relies too much on the local number of observations. It is overfitting.
+2. Comment on the influence of the bandwidth on the quality of estimation.
 
-If the bandwisth is too big, then the estimator is underfitting as it takes into account the number of observations in a very wide interval.
+For the smallest bandwidth values, the estimated function fluctuates a lot (ex. the blue curve for C = 0.1).
+This is because for a low bandwidth, the estimator makes calculations based on a very narrow interval and sticks to the observations too much.
+
+For the largest bandwidth values, the estimated function is almost constant (ex. the blue curve for C = 5).
+Indeed, with a very large bandwidth, the estimators uses intervals that are too wide, it doesn't take into account the observations enough.
+
+As a conclusion:
+- With a bandwidth that is too small, the model is overfitting the data
+- With a bandwidth that is too large, it is underfitting the data
+
+The objective is to find the optimal bandwidth.
 
 # 3. Estimation of MSE and MISE
 
@@ -194,14 +205,6 @@ If $f$ was known, then we could estimate the discretized MISE by the following q
 $$\frac{1}{n} \sum_{i=1}^n \left(\hat{f_n}(X_i) - f(X_i)\right)^2$$
 
 
-```{r}
-MISE_NW <- function(bandwidth, x, y, f) {
-    fit <- NW(x, y, bandwidth = bandwidth)
-    mean((fit$y - f(fit$x))^2)
-}
-
-```
-
 ```{r, echo=FALSE}
 QQ <- QQ +1
 ```
@@ -216,12 +219,12 @@ best <- round(opt$minimum, 3)
 best
 ```
 
-- Can the above be done in practice, ie given only the observations `X` and `Y`?
+1. Can the above be done in practice, ie given only the observations `X` and `Y`?
 
 The above calculation can't be done in practice as it requires the knowledge of the function f.
-In our case, f is the objective so we can't use it.
+In our case, f is the objective so we can't use it in the estimator.
 
-- Estimate the above optimal bandwidth from another simulation  run with $n=2,000$. Are these results consistent with the theoretical upper bounds obtained during the course? [*Hint: recall the form of the optimal bandwidth for a kernel of order 1*]. 
+2. Estimate the above optimal bandwidth from another simulation  run with $n=2,000$. Are these results consistent with the theoretical upper bounds obtained during the course? [*Hint: recall the form of the optimal bandwidth for a kernel of order 1*]. 
 
 First, let's generate new X and Y with 2000 observations
 
@@ -251,11 +254,15 @@ fit <- NW(X_2000, Y_2000, bandwidth = bwd)
 lines(fit, col ="red")
 ```
 
-The estimated curve is really close to the real function f. The estimator worked well.
+The estimated curve is really close to the real function f. The estimator did a good job at estimating the function.
 
 SECONDE PARTIE A DEMANDER A ALEX
 
-- Without doing further simulation runs, estimate the optimal bandwidth for $n=20,000$ and $n=2,000,000$. 
+```{r}
+# Calculer le beta et blabla
+```
+
+3. Without doing further simulation runs, estimate the optimal bandwidth for $n=20,000$ and $n=2,000,000$. 
 
 IDEM
 
@@ -285,7 +292,6 @@ hs <- 1:100/500
 ```
 
 1.Calculate the above estimator for all bandwidths, and plot the result as a function of `h`. 
-2.Comment the results and explain why this estimator cannot be used to estimate an optimal bandwidth.
 
 ```{r}
 mise_nw_0_list <- c()
@@ -293,10 +299,15 @@ for (h in hs){
   mise_nw_0_list[length(mise_nw_0_list) + 1] <- MISE_NW_0(h,X,Y)
 }
 
-plot(hs, mise_nw_0_list, xlab = "bandwidth", ylab = "Discretized estimator")
+plot(hs, mise_nw_0_list, xlab = "bandwidth", ylab = "Discretized MISE")
 ```
 
-The estimator can't be used to estimate an optimal bandwidth as it always increases with the bandwidth, there is no clear optimum.
+2.Comment the results and explain why this estimator cannot be used to estimate an optimal bandwidth.
+
+The estimator can't be used to estimate an optimal bandwidth as it is an increasing function of hs.
+The lowest MISE is obtained with h = 0 and we've already explained that this is not an option as it leads to an overfitting model.
+
+ON PEUT POTENTIELLEMENT TROUVER UN OPTIMUM SUR LE POINT D'INFLEXION A 0.05
 
 ```{r, echo=FALSE}
 QQ <- QQ +1
@@ -350,7 +361,8 @@ curve(f)
 matlines(X, fHatMat, col = 3)
 curve(f, add = TRUE)
 ```
-These are 101 estimations of f with a bandwidth = 0.04
+These are 100 estimations of f with a bandwidth = 0.04.
+This value of the bandwidth is close to the calculated optimum bandwidth, that's why the estimations are fine.
 
 
 2. Likewise, comment on the following distribution of yellow curves :
@@ -362,7 +374,9 @@ curve(f)
 matlines(X, fHatMat, col = 7)
 curve(f, add = TRUE)
 ```
-With a very low bandwidth, the esimator is overfitting the observations.
+These are 100 estimations of f with a bandwidth = 0.004.
+0.004 is a very low bandwidth and the estimated functions fluctuate a lot.
+As explained previoulsy, the esimator is overfitting the data.
 
 ```{r, echo=FALSE}
 QQ <- QQ +1
@@ -389,7 +403,7 @@ curve(f)
 matlines(X, fHatMat, col = 7)
 curve(f, add = TRUE)
 ```
-With a bandwidth = 0.5, the model is underfitting as it is too high
+With a bandwidth = 0.2, the model is underfitting as it is too large.
 
 2. We can form an estimate of the MSE as follows:
 
@@ -434,8 +448,11 @@ Estim3
 ```
 
 MSEh1.2.3 are vector of size n containing the MSE for each observation over the nRep contained in fhatmat.
-Estim1,2,3 are scalars equal to the mean of the n MSE
-
+Estim1,2,3 are scalars equal to the mean of the n MSE calculated over each observation.
+Estim is the MISE
+- MSEh1 is the vector of n MSE for a bandwidth $h1 = 0.3$ and 1000 repetitions. This is a large bandwidth and the model is underfitting, that's why the MSE is large.
+- MSEh2 is the vector of n MSE for a bandwidth $h2 = 0.04$ and 100 repetitions. This is close to the optimal bandwidth and the MSE is low.
+- MSEh3 is the vector of n MSE for a bandwidth $h3 = 0.003$ and 100 repetitions. This is a low bandwidth and the model is overfitting. That's why the MSE is larger than with an optimal bandwidth.
 
 ```{r, echo=FALSE}
 QQ <- QQ +1
@@ -472,39 +489,26 @@ calculate_bias_and_variance <- function (nRep, X_vect) {
 }
 
 nRep <- 101
-hs <- 1:200/200
-bias_and_var <- calculate_bias_and_variance(nRep, X)
-```
-
-
-```{r}
-bias_list <- bias_and_var$bias
-var_list <- bias_and_var$var
-mise_list <- bias_list + var_list
-
-plot(x = hs, y = bias_list, col = "blue")
-points(x = hs, y = var_list, col = "red")
-points(x = hs, y = mise_list, col = "black")
-```
-
-
-```{r}
 hs <- 1:100/500
 bias_and_var <- calculate_bias_and_variance(nRep, X)
+```
 
+
+```{r}
 bias_list <- bias_and_var$bias
 var_list <- bias_and_var$var
 mise_list <- bias_list + var_list
 
-plot(x = hs, y = bias_list, col = "blue")
-points(x = hs, y = var_list, col = "red")
-points(x=hs, y = mise_list, col = "black")
+plot(x = hs, y = bias_list, col = 2, ylab = "", type = "l", lwd = 2)
+points(x = hs, y = var_list, col = 3, type = "l", lwd = 2)
+points(x=hs, y = mise_list, col = 4, type = "l", lwd = 2)
+legend(x = "topleft", lty = 1 , legend = c("Bias", "Variance", "MISE"), col = 2:4)
 ```
 
 
 ```{r}
 h_opt_mise <- hs[which.min(mise_list)]
-print(paste("The bandwidth that minimizes the mise is", h_opt_mise))
+print(paste("The bandwidth that minimizes the mise as bias + variance is", h_opt_mise))
 print(paste("The bandwidth that was estimated previously as optimum was", best))
 ```
 
@@ -527,12 +531,12 @@ abline(h=0, lty = 2)
 
 This plots represents the MSE as a function of X:
 For each X, nRep evaluations of the function f are made, and a MSE is calculated from these nRep values.
-The plots for C = 3 shows that the MSE is really low from 0.2 to 0.8 whatever h, but on the boundaries of the interval, it increases.
+The plots show that the MSE is really low from 0.2 to 0.8 whatever h, but on the boundaries of the interval, it increases.
 
 Let's try it with other values for C:
 ```{r}
 par(lwd = 2, mfrow = c(1,1))
-C_list <- c(1,3,5,10)
+C_list <- c(1,2,4, 8)
 for (C in C_list) {
   plot(X, MSE(best/C, n, sigma2, f, 50), t = 'l', ylab = "MSE", col = 2, ylim = c(0, 0.1), main = paste("C = ", C))
   lines(X, MSE(best, n, sigma2, f, 50), col = 3)
@@ -582,16 +586,16 @@ The further the points are from $x$, the lower the weight in the estimation.
 For instance, with $x = 1/2$, a large part of the interval is taken into account to calculate the estimator.
 Moreover, this is the central zone in which the function is maximum so a large part of the information is used.
 
-But in the boundaries, a small part of the $X_i$ are really used because half of the gaussian centred on 0 or 1 is off limits.
-Moreover, the function f is very close to 0 for $x \sim 0$ or $x \sim 1$. So the majority of the observations information is very low weighted and not taken into account for the calcul of the estimator.
+But in the boundaries, a small proportion of the $X_i$ is really used because half of the gaussian centred on 0 or 1 is off limits.
+Moreover, the function f is very close to 0 for $x \sim 0$ or $x \sim 1$. So the majority of the observations information is very low weighted and not taken into account for the calculation of the estimator.
 
 That's why the estimator isn't great at the boundaries for this function.
 
 3. In particular, try to figure out what happens with the estimator when the bandwidth is rather large, and illustrate it.
 
-When the bandwidth is rather large, then the weights are more centered. That means that for a given $x$, more weight will be given to the $X_i \sim x$ and fewer to the other $X_i$.
+When the bandwidth is rather large, then the gaussian kernel is more centered. That means that for a given $x$, more weight will be given to the $X_i \sim x$ and fewer to the other $X_i$.
 
-So the estimator will be mostly calculated on zones where there is very few information as the function is close to zero.
+So when applied to $x \sim 0$ or $x \sim 1$ the estimator will be mostly calculated on zones where there is very few information as the function is close to zero.
 
 We expect the boundary effect to be more important in that case as explained in the previous question.
 
@@ -601,12 +605,18 @@ fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
 curve(f)
 matlines(X, fHatMat, col = 7)
 curve(f, add = TRUE)
+
+par(lwd = 2, mfrow = c(1,1))
+plot(X, MSE(best, n, sigma2, f, 50), col = 1)
+lgd <- c("h = 2 * h*")
+legend("top", lgd, col = 2:4, lty = 1)
+abline(h=0, lty = 2)
 ```
 
-As seen on the plot, the boundary effect increase even at $h = 2*h_{opt}$.
+As seen on the plot, the boundary effect increases even at $h = 2*h_{opt}$.
 
 
-# 5. Local polynomials
+# 6. Local polynomials
 
 
 ```{r, echo=FALSE}
@@ -617,8 +627,69 @@ QQ <- QQ +1
 ## Question `r QQ`
 
 1. Using the above example of Nadaraya-Watson, create a function `fHat_LP` that generates a local polynomial regression estimator, and functions `MSE_LP` and `MISE_LP` that estimate the associated MSE and MISE, respectively.
-1. Calculate the optimal bandwidth for local polynomial estimators of degree 0, 1, 2. 
-1. Plot the MSE associated to the optimal bandwidth, and compare the MSE at the boundary for local polynomial estimators of degree 0, 1, 2.
+
+```{r}
+my_NW_LP <- function(x, y, bandwidth, degree ,gridsize = length(x), ...) {
+  locpoly(x, y, degree = degree, bandwidth = bandwidth, gridsize = gridsize,  ...)
+}
+
+fHat_LP <- function(bandwidth, n, sigma2, f, degree) {
+    eps <- rnorm(n, sd = sqrt(sigma2))
+    X <- 1:n/n
+    Y <- f(X) + eps
+    fit <- my_NW_LP(X, Y, bandwidth = bandwidth, degree)
+    #locpoly(X, Y, degree = degree, bandwidth = bandwidth, gridsize = length(X))
+    fit$y
+} 
+
+MISE_LP <- function(bandwidth, x, y, f, degree) {
+    fit <- my_NW_LP(x, y, bandwidth = bandwidth, degree)
+    mean((fit$y - f(fit$x))^2)
+}
+
+MSE_LP <- function(bandwidth, n, sigma2, f, nRep, degree) {
+    fHatMat <- replicate(nRep, fHat_LP(bandwidth, n, sigma2, f, degree))
+    diffs <- sweep(fHatMat, 1, f(X))
+    mse <- rowMeans(diffs^2)
+}
+```
+
+
+2. Calculate the optimal bandwidth for local polynomial estimators of degree 0, 1, 2. 
+
+```{r}
+degree_list <- 0:2
+optim_bandwidth_list <- c()
+
+for (degree in degree_list) {
+  opt <- optimize(MISE_LP, X, Y, f, degree,interval = c(0, 1))
+  best_bwd <- round(opt$minimum, 3)
+  print( paste ("The optimal bandwidth for LP estimators of degree ", degree, " = ",best_bwd) )
+  optim_bandwidth_list[ length(optim_bandwidth_list) + 1 ] <- best_bwd
+}
+```
+
+
+3. Plot the MSE associated to the optimal bandwidth, and compare the MSE at the boundary for local polynomial estimators of degree 0, 1, 2.
+
+```{r}
+par(mfrow = c(1,1))
+
+plot(X, MSE(best, n, sigma2, f, 50), col = 1, main = "Previous MSE with optimal bandwidth")
+legend("top", lgd, col = 2:4, lty = 1)
+abline(h=0, lty = 2)
+
+for ( i in 1:length(degree_list) ){
+  
+  plot(X, MSE_LP(optim_bandwidth_list[i], n, sigma2, f, 50, degree_list[i]), col = 1 + i,
+       main = paste("Degree = ", degree_list[i]), ylab = "MSE LP", ylim = c(0,0.2), type = "l", lwd = 2)
+  abline(h=0, lty = 2)
+  
+}
+```
+
+These plots are using the same y scale so that we can compare the boundary effects.
+Even though we can still see some increase in the MSE at the boundaries, it seems that increasing the degree of the local polynom used is decreasing the boundary effect.
 
 # 6. Cross-validation
 
@@ -656,17 +727,62 @@ getW <- function(X, h) {
 ## Question `r QQ`
 
 1. explain why the above code does indeed calculate $W$
-1. write a function to estimate the cross-validation risk for a local polynomial estimator
-1. compare the cross-validation bandwidth to the optimal bandwidth in terms of associated MSE. 
-1. which of the two should be used in practice?
 
-```{r, echo=FALSE}
-QQ <- QQ +1
+In this code, W is filled line by line.
+for the line ii, the weights are calculated thanks to a vector Y built such as $Y_i[ii] = 1$ but $Y_I[i] = 0$ if $i \neq ii$.
+Then the line ii is filled with terms that depend on $X_j - X_{ii}$, where j is the column number.
+Each term $W_{i,j}$ is indeed the weight between $X_i$ and $X_j$
+
+2. write a function to estimate the cross-validation risk for a local polynomial estimator
+
+```{r}
+CV_risk <- function(X, Y, h) {
+  
+  n <- length(X)
+  W <- getW(X, h)
+  CV <- 0
+  
+  for (i in 1:n) {
+      
+    fHat_Xi <- sum(Y*W[,i])
+    numerator <- Y[i] - fHat_Xi
+    denominator <- 1 - W[i,i]
+    CV <- CV + (numerator/denominator)**2
+    
+  }
+  
+  return (CV/n)
+}
+
+CV_risk(X, Y, best)
 ```
 
-## Question `r QQ`: bonus
+3. compare the cross-validation bandwidth to the optimal bandwidth in terms of associated MSE. 
 
-1. The function `locpoly` can also calculate derivatives of the regression:
+```{r}
+par(mfrow = c(1,1))
+CV_risk_list <- c()
+for ( h in hs ) {
+  CV_risk_list [length(CV_risk_list) + 1] <- CV_risk(X, Y, h)
+}
+plot(hs, CV_risk_list)
+```
+
+```{r}
+CV_risk_optimal_bwd <- hs[which.min(CV_risk_list)]
+associated_mse_CV <- sum(MSE(CV_risk_optimal_bwd, n, sigma2, f, 50))/n 
+associated_mse_opt_bwd <- sum(MSE(best, n, sigma2, f, 50))/n 
+print(paste ("The bandwidth that minimizes the CV risk is ", CV_risk_optimal_bwd, "with MSE = ", associated_mse_CV ) )
+print( paste("REMINDER : The bandwidth that minimizes the MSE is ", best, "with MSE = ", associated_mse_opt_bwd) )
+```
+
+4. which of the two should be used in practice?
+
+The bandwidth obtained thanks to the Cross Validation should be used as it was calculated with a method that does not require f to be known.
+
+# 7. Derivative
+
+The function `locpoly` can also calculate derivatives of the regression:
 
 ```{r}
 fit <- locpoly(X, Y, drv = 1, bandwidth = 0.1, gridsize=length(X))
@@ -675,6 +791,31 @@ ff <- function(x) sin(pi*x)/sqrt(x)/2 + pi*sqrt(x)*cos(pi*x)
 curve(ff, add = TRUE)
 ```
 
+```{r, echo=FALSE}
+QQ <- QQ +1
+```
+
+## Question `r QQ`
+
+1. What is pictured in the above estimation plot?
+
+It is easy to demonstrate that ff is the analytic derivative of the function f.
+The curve is the curve of the derivative of the function f.
+
+The argument drv = 1 means that the locpoly function will try to predict the first derivative of the function based on the observations X and Y.
+
+The black points are the estimated derivative of the function.
+
+
+2. Evaluate the MSE and MISE performance of the local polynomial estimator of the derivative of f.
+
+```{r}
+par(lwd = 2, mfrow = c(1,1))
+plot(X, MSE(best, n, sigma2, f, 50), col = 1)
+lgd <- c("h = h*")
+legend("top", lgd, col = 2:4, lty = 1)
+abline(h=0, lty = 2)
+```
 
 
 # Appendix

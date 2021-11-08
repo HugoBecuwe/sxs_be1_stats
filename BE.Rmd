@@ -114,8 +114,7 @@ MISE_NW <- function(bandwidth, x, y, f) {
     fit <- NW(x, y, bandwidth = bandwidth)
     mean((fit$y - f(fit$x))^2)
 }
-opt <- optimize(MISE_NW, X, Y, f, interval = c(0, 1))
-best <- round(opt$minimum, 3)
+
 ```
 
 # 2. Nadaraya-Watson estimator
@@ -138,13 +137,13 @@ QQ <- QQ + 1
 
 ## Question `r QQ`: influence of the bandwidth
 
-Let us admit for a while that a "good choice" for the bandwidth in the NW estimator is  $h^\star = `r best`$.  In order to further asses the influence of the bandwidth on the quality of estimation, we compare this choice to two other choices $h = 1/C \times h^\star$ and $h = C \times h^\star$, for $C=10$. 
+Let us admit for a while that a "good choice" for the bandwidth in the NW estimator is  $h^\star = 0.057$.  In order to further asses the influence of the bandwidth on the quality of estimation, we compare this choice to two other choices $h = 1/C \times h^\star$ and $h = C \times h^\star$, for $C=10$. 
 
 ```{r}
 par(lwd = 2)
 plot(X, Y, col = "lightgray")
 curve(f, add = TRUE, col = 1, lty = 2)
-
+best <- 0.057
 C <- 10
 bwd <- c(1/C, 1, C)*best
 for (kk in 1:length(bwd)) {
@@ -152,7 +151,7 @@ for (kk in 1:length(bwd)) {
     lines(fit, col = 1 + kk)
 }
 lgd <- c("h = 1/C x h*", "h = h*", "h = C x h*")
-legend("bottom", lgd, col = 2:4)
+legend("bottom", lgd, col = 2:4, lty = 1)
 ```
 
 
@@ -559,7 +558,7 @@ legend(x = "topleft", lty = 1 , legend = c("Bias", "Variance", "MISE"), col = 2:
 ```{r}
 h_opt_mise <- hs[which.min(mise_list)]
 print(paste("The bandwidth that minimizes the mise as bias + variance is", h_opt_mise))
-print(paste("The bandwidth that was estimated previously as optimum was", best))
+print(paste("REMINDER : The bandwidth that was estimated previously as optimum was", best))
 ```
 
 # 5. Boundary effects
@@ -613,7 +612,7 @@ QQ <- QQ + 1
 par(lwd = 2, mfrow = c(1,1))
 plot(X, MSE(best, n, sigma2, f, 50), col = 1)
 lgd <- c("h = h*")
-legend("top", lgd, col = 2:4, lty = 1)
+legend("top", lgd, col = 1, lty = 1)
 abline(h=0, lty = 2)
 ```
 
@@ -643,9 +642,7 @@ That's why the estimator isn't great at the boundaries for this function.
 
 3. In particular, try to figure out what happens with the estimator when the bandwidth is rather large, and illustrate it.
 
-When the bandwidth is rather large, then the gaussian kernel is more centered. That means that for a given $x$, more weight will be given to the $X_i \sim x$ and fewer to the other $X_i$.
-
-So when applied to $x \sim 0$ or $x \sim 1$ the estimator will be mostly calculated on zones where there is very few information as the function is close to zero.
+When the bandwidth is rather large, then the variance of the gaussian kernel increases. That means that for a given $x$, more weight will be given to the $X_i \sim x$ that are far from $x$. If the variance increases too much, then the weight given to points that are too far is too important and the model underfits.
 
 We expect the boundary effect to be more important in that case as explained in the previous question.
 
@@ -688,7 +685,6 @@ fHat_LP <- function(bandwidth, n, sigma2, f, degree) {
     X <- 1:n/n
     Y <- f(X) + eps
     fit <- my_NW_LP(X, Y, bandwidth = bandwidth, degree)
-    #locpoly(X, Y, degree = degree, bandwidth = bandwidth, gridsize = length(X))
     fit$y
 } 
 
@@ -861,13 +857,49 @@ The black points are the estimated derivative of the function.
 
 2. Evaluate the MSE and MISE performance of the local polynomial estimator of the derivative of f.
 
+Let's simulate a realization of the function ff for the same vector X
+
 ```{r}
-par(lwd = 2, mfrow = c(1,1))
-plot(X, MSE_LP(best, n, sigma2, f, 50, degree = 1), col = 1)
-MISE_LP(best, X, Y, f, degree = 1)
-lgd <- c("h = h*")
-legend("top", lgd, col = 1, lty = 1)
+YY <- ff(X) + eps
+plot(X, YY, main = "Realization of ff")
+curve(ff, add = TRUE)
+```
+
+Then let's evaluate the MSE and MISE for various degrees of local polynomials
+
+```{r}
+degree_list <- 0:2
+
+df <- data.frame( "degree" = degree_list, "MSE" = rep(0, length(degree_list)), "MISE" = rep(0, length(degree_list)))
+
+for (degree in df$degree) {
+  mse_der <- sum( MSE_LP(best, n, sigma2, ff, 50, degree)) / n
+  mise_der <- MISE_LP(best, X, YY, ff, degree)
+  
+  df[df$degree == degree, c("MSE", "MISE")] <- c(mse_der, mise_der
+                                                 )
+}
+
+df
+```
+
+We can also plot the MSE alongside the X axis
+
+```{r}
+par(mfrow = c(1,1))
+
+plot(X, MSE(best, n, sigma2, ff, 50), col = 1, type = "l")
 abline(h=0, lty = 2)
+
+for ( i in 1:length(degree_list) ){
+  
+  points(X, MSE_LP(optim_bandwidth_list[i], n, sigma2, ff, 50, degree_list[i]), col = 1 + i,
+       main = paste("Degree = ", degree_list[i]), ylab = "MSE LP", ylim = c(0,0.2), type = "l", lwd = 2)
+  abline(h=0, lty = 2)
+  
+}
+
+legend( x = "topleft", legend = c("Previous MSE", "LP deg 0", "LP deg 1", "LP deg 2"), col = 1:4, lty = 1)
 ```
 
 

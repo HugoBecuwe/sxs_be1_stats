@@ -178,14 +178,16 @@ for ( C in C_list )
 2. Comment on the influence of the bandwidth on the quality of estimation.
 
 For the smallest bandwidth values, the estimated function fluctuates a lot (ex. the blue curve for C = 0.1).
-This is because for a low bandwidth, the estimator makes calculations based on a very narrow interval and sticks to the observations too much.
+This is because for a low bandwidth, the estimator makes calculations based on a very narrow interval and returns a function which sticks to local observations too much.
 
 For the largest bandwidth values, the estimated function is almost constant (ex. the blue curve for C = 5).
-Indeed, with a very large bandwidth, the estimators uses intervals that are too wide, it doesn't take into account the observations enough.
+Indeed, with a very large bandwidth, the estimators uses intervals that are too wide, it doesn't take into account local observations enough.
 
 As a conclusion:
-- With a bandwidth that is too small, the model is overfitting the data
-- With a bandwidth that is too large, it is underfitting the data
+
+  - With a bandwidth that is too small, the model is overfitting the data
+  
+  - With a bandwidth that is too large, it is underfitting the data
 
 The objective is to find the optimal bandwidth.
 
@@ -263,7 +265,7 @@ We know that
 $$h_n^* = C_{te} \times n^{\frac{-1}{2\beta+1}}$$
 Then as we've measured $h^*$ for $n=200$ and $n=2000$ we can estimate $\beta$
 $$\beta = \frac{1}{2} \times (1 - \frac{\ln(\frac{n_1}{n_2})}{\ln(\frac{h_{n1}^*}{h_{n2}^*})})$$
-We first estimate a mean optimal bandwidth over various samples so that it isn't too reliant on the noice.
+We first estimate a mean optimal bandwidth over various samples so that it isn't too reliant on the noise.
 Then we calculate the beta coefficient.
 
 ```{r}
@@ -332,7 +334,7 @@ MISE_NW_0 <- function(bandwidth, x, y) {
 We define a grid of 100 values for the bandwidth `h` between 0 and 0.2.
 
 ```{r}
-hs <- 1:100/500
+hs <- 1:500/500
 ```
 
 1.Calculate the above estimator for all bandwidths, and plot the result as a function of `h`. 
@@ -349,14 +351,22 @@ plot(hs, mise_nw_0_list, xlab = "bandwidth", ylab = "Discretized MISE")
 2.Comment the results and explain why this estimator cannot be used to estimate an optimal bandwidth.
 
 The estimator can't be used to find the hs that gives the minimum MISE.
-The lowest MISE is obtained with h = 0 and we've already explained that this is not an option as it leads to an overfitting model.
+The lowest MISE is obtained with h -> 0 and we've already explained that this is not an option as it leads to an overfitting model.
 
-However, we can split the curve in 3 intervals. 
-- For $h<0.3$, the MISE increases a lot with h. This is where the estimator overfits
-- For $h \in [0.3;0.6]$, the curve is rather constant
-- For $h>0.6$, the MISE increases a lot again. This is where the estimator underrfits
+However, we find a first inflexion point before $h = 0.1$
 
-So even if we can't find the h that gives the minimal MISE, we can graphically assume that the optimal bandwidth is between 0.3 and 0.6, which is the result obtained.
+```{r}
+hs <- 1:100/500
+mise_nw_0_list <- c()
+for (h in hs){
+  mise_nw_0_list[length(mise_nw_0_list) + 1] <- MISE_NW_0(h,X,Y)
+}
+plot(hs, mise_nw_0_list, xlab = "bandwidth", ylab = "Discretized MISE")
+```
+
+This inflexion point is around $h \sim 0.05$ and is between two intervals where the MISE increases a lot with h.
+
+So even if we can't find the h that gives the minimal MISE, we can graphically assume that the optimal bandwidth is around 0.05 which is the result we calculated above.
 
 ```{r, echo=FALSE}
 QQ <- QQ +1
@@ -392,6 +402,7 @@ lines(X, fHat(0.1,  n, sigma2, f), col = 4, lty = 2)
 Following this idea, we generate and plot a matrix of realizations of $\hat{f}$:
 
 ```{r}
+par(mfrow = c(1,1))
 bandwidth <- 0.3
 fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
 curve(f)
@@ -404,12 +415,14 @@ curve(f, add = TRUE)
 1. What represent the following distribution of green curves :
 
 ```{r}
+par(mfrow = c(1,1))
 bandwidth <- 0.04
 fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
 curve(f)
 matlines(X, fHatMat, col = 3)
 curve(f, add = TRUE)
 ```
+
 These are 100 estimations of f with a bandwidth = 0.04.
 This value of the bandwidth is close to the calculated optimum bandwidth, that's why the estimations are fine.
 
@@ -417,12 +430,14 @@ This value of the bandwidth is close to the calculated optimum bandwidth, that's
 2. Likewise, comment on the following distribution of yellow curves :
 
 ```{r}
+par(mfrow = c(1,1))
 bandwidth <- 0.004
 fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
 curve(f)
 matlines(X, fHatMat, col = 7)
 curve(f, add = TRUE)
 ```
+
 These are 100 estimations of f with a bandwidth = 0.004.
 0.004 is a very low bandwidth and the estimated functions fluctuate a lot.
 As explained previoulsy, the esimator is overfitting the data.
@@ -437,6 +452,7 @@ QQ <- QQ +1
 of the influence of the bandwidth?
 
 ```{r}
+par(mfrow = c(1,1))
 bandwidth <- 0.01
 fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
 curve(f)
@@ -446,6 +462,7 @@ curve(f, add = TRUE)
 With a bandwidth = 0.01, we are overfitting as expected, the bandwidth is too small
 
 ```{r}
+par(mfrow = c(1,1))
 bandwidth <- 0.5
 fHatMat <- replicate(101, fHat(bandwidth, n, sigma2, f))
 curve(f)
